@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Tracking Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+            justify-content: center;
+            background-color: rgb(213, 238, 230);
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            gap: 20px;
+        }
+        .form-container, .chat-container {
+            flex: 1;
+            max-width: 400px;
+        }
+        .form-container form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+        }
+        input, select {
+            margin-bottom: 15px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .chatbox {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .chat-input {
+            display: flex;
+            margin-top: 10px;
+        }
+        .chat-input input {
+            flex: 1;
+            margin-right: 5px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            white-space: pre-line;
+        }
+        .bmi-result {
+            font-weight: bold;
+            margin-top: 15px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Form Section -->
+        <div class="form-container">
+            <h1>Health Tracking Form</h1>
+            <form id="healthForm">
+                <label for="name">Name:</label>
+                <input type="text" id="name" required aria-label="Name">
+
+                <label for="age">Age:</label>
+                <input type="number" id="age" required min="1" max="120" aria-label="Age">
+
+                <label for="weight">Weight (kg):</label>
+                <input type="number" id="weight" required min="1" aria-label="Weight">
+
+                <label for="height">Height (cm):</label>
+                <input type="number" id="height" required min="30" max="250" aria-label="Height">
+
+                <label for="goal">Weight Goal:</label>
+                <select id="goal" required aria-label="Weight Goal">
+                    <option value="gain">Weight Gain</option>
+                    <option value="loss">Weight Loss</option>
+                </select>
+
+                <label for="diet">Dietary Preference:</label>
+                <select id="diet" required aria-label="Dietary Preference">
+                    <option value="veg">Vegetarian</option>
+                    <option value="non-veg">Non-Vegetarian</option>
+                </select>
+
+                <button type="submit">Submit</button>
+                <div class="bmi-result" id="bmiResult"></div>
+            </form>
+        </div>
+
+        <!-- Chatbot Section -->
+        <div class="chat-container">
+            <h1>Chat Bot</h1>
+            <div class="chatbox" id="chatbox"></div>
+            <div class="chat-input">
+                <input type="text" id="userMessage" placeholder="Ask me for food/exercise recommendations...">
+                <button id="sendMessage">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatbox = document.getElementById('chatbox');
+        const userMessage = document.getElementById('userMessage');
+        const sendMessage = document.getElementById('sendMessage');
+        const healthForm = document.getElementById('healthForm');
+        const bmiResult = document.getElementById('bmiResult');
+        let recommendations = [];
+
+        // Load recommendations from CSV file
+        fetch('meal_plan_extended.csv')
+            .then(response => response.text())
+            .then(data => {
+                const rows = data.split('\n').slice(1); // Skip header row
+                rows.forEach(row => {
+                    const columns = row.split(',');
+                    if (columns.length === 5) { // Expecting 5 columns now
+                        recommendations.push({
+                            goal: columns[0].trim(),
+                            diet: columns[1].trim(),
+                            time: columns[2].trim(),
+                            recommendation: columns[3].trim(), // Food recommendation
+                            exercise: columns[4].trim() // Exercise recommendation
+                        });
+                    }
+                });
+                console.log("Parsed recommendations:", recommendations); // Log for verification
+            })
+            .catch(error => console.error('Error loading CSV:', error));
+        
+        healthForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const name = document.getElementById('name').value;
+            const age = document.getElementById('age').value;
+            const weight = document.getElementById('weight').value;
+            const height = document.getElementById('height').value;
+            const goal = document.getElementById('goal').value;
+            const diet = document.getElementById('diet').value;
+
+            // Calculate and display BMI
+            const bmi = (weight / Math.pow(height / 100, 2)).toFixed(2);
+            const bmiStatus = getBmiStatus(bmi);
+            bmiResult.textContent = `BMI: ${bmi} (${bmiStatus})`;
+
+            alert(`Form submitted successfully!\nName: ${name}\nAge: ${age}\nWeight: ${weight}kg\nHeight: ${height}cm\nGoal: ${goal}\nDiet: ${diet}`);
+            
+            provideDailyRoutine(goal, diet);
+        });
+
+        sendMessage.addEventListener('click', function() {
+            const message = userMessage.value;
+            if (message.trim()) {
+                addMessage('You: ' + message);
+                provideDailyRoutine(document.getElementById('goal').value, document.getElementById('diet').value);
+                userMessage.value = '';
+            }
+        });
+
+        function addMessage(text) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message');
+            messageElement.textContent = text;
+            chatbox.appendChild(messageElement);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function provideDailyRoutine(goal, diet) {
+            const routine = {
+                morning: '',
+                afternoon: '',
+                evening: ''
+            };
+
+            const exercises = {
+                morning: '',
+                afternoon: '',
+                evening: ''
+            };
+
+            recommendations.forEach(item => {
+                if (item.goal === goal && item.diet === diet) {
+                    routine[item.time.toLowerCase()] = item.recommendation;
+                    exercises[item.time.toLowerCase()] = item.exercise; // Add exercise recommendations
+                }
+            });
+
+            const messages = [];
+            for (const time in routine) {
+                if (routine[time]) {
+                    messages.push(`${time.charAt(0).toUpperCase() + time.slice(1)}:\nFood Recommendation: ${routine[time]}\nExercise Recommendation: ${exercises[time] || 'No exercise recommendation available.'}`);
+                }
+            }
+
+            addMessage(`Chatbot:\n${messages.join('\n') || 'No recommendations found.'}`);
+        }
+
+        function getBmiStatus(bmi) {
+            if (bmi < 18.5) return 'Underweight';
+            if (bmi < 24.9) return 'Normal weight';
+            if (bmi < 29.9) return 'Overweight';
+            return 'Obesity';
+        }
+    </script>
+</body>
+</html>
